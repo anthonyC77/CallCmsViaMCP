@@ -5,9 +5,10 @@ using SiteGuardian.Api.Services.Audit;
 namespace SiteGuardian.Api.Cli;
 
 /// <summary>
-/// Mode CLI : `dotnet run -- audit &lt;url&gt; [--max-pages N]`.
+/// Mode CLI : `dotnet run -- audit &lt;url&gt; [--max-pages N] [--pdf chemin.pdf]`.
 /// Audit complet sans serveur web ni base — pensé pour le cron GitHub Actions (§11).
-/// Sortie : findings groupés par sévérité sur stdout. Code retour 0 = OK, 1 = erreur.
+/// Sortie : findings groupés par sévérité sur stdout (+ PDF en option).
+/// Code retour 0 = OK, 1 = erreur.
 /// </summary>
 public static class AuditCommand
 {
@@ -15,14 +16,19 @@ public static class AuditCommand
     {
         if (args.Length == 0 || !Uri.TryCreate(args[0], UriKind.Absolute, out var root))
         {
-            Console.Error.WriteLine("Usage : dotnet run -- audit <url> [--max-pages N]");
+            Console.Error.WriteLine("Usage : dotnet run -- audit <url> [--max-pages N] [--pdf chemin.pdf]");
             return 1;
         }
 
         var maxPages = 60;
+        string? pdfPath = null;
         for (var i = 1; i < args.Length - 1; i++)
+        {
             if (args[i] == "--max-pages" && int.TryParse(args[i + 1], out var n))
                 maxPages = n;
+            if (args[i] == "--pdf")
+                pdfPath = args[i + 1];
+        }
 
         try
         {
@@ -51,6 +57,20 @@ public static class AuditCommand
                 Console.WriteLine($"\n--- {group.Key.ToString().ToUpperInvariant()} ({group.Count()}) ---");
                 foreach (var f in group)
                     Console.WriteLine($"  [{f.Category}] {f.Title} — {f.PageCount} page(s)");
+            }
+
+            if (pdfPath is not null)
+            {
+                var job = new AuditJob
+                {
+                    TargetUrl = root.ToString(),
+                    Status = AuditStatus.Completed,
+                    CompletedAt = DateTimeOffset.UtcNow,
+                    PagesAudited = results.Count,
+                    Findings = findings,
+                };
+                await File.WriteAllBytesAsync(pdfPath, Services.Pdf.AuditPdfGenerator.Generate(job));
+                Console.WriteLine($"\n[SiteGuardian] PDF écrit : {Path.GetFullPath(pdfPath)}");
             }
 
             return 0;

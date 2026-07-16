@@ -104,6 +104,22 @@ app.MapGet("/api/audit/{id:guid}", async (Guid id, SiteGuardianDbContext db) =>
 })
 .WithName("GetAudit");
 
+// Télécharge le rapport PDF d'un audit terminé.
+app.MapGet("/api/audit/{id:guid}/pdf", async (Guid id, SiteGuardianDbContext db) =>
+{
+    var job = await db.AuditJobs.Include(j => j.Findings)
+        .FirstOrDefaultAsync(j => j.Id == id);
+    if (job is null) return Results.NotFound();
+    if (job.Status != AuditStatus.Completed)
+        return Results.Conflict(new { error = $"Audit non terminé (statut : {job.Status})." });
+
+    var host = Uri.TryCreate(job.TargetUrl, UriKind.Absolute, out var uri) ? uri.Host : "site";
+    var bytes = SiteGuardian.Api.Services.Pdf.AuditPdfGenerator.Generate(job);
+    return Results.File(bytes, "application/pdf",
+        $"audit-{host}-{(job.CompletedAt ?? DateTimeOffset.UtcNow):yyyy-MM-dd}.pdf");
+})
+.WithName("GetAuditPdf");
+
 // Importe un rapport JSON produit par le swarm d'agents (.claude/agents).
 app.MapPost("/api/audit/import", async (HttpRequest request, SiteGuardianDbContext db) =>
 {

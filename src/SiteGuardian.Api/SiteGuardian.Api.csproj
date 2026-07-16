@@ -12,6 +12,7 @@
          vulnérable (NU1903). La 2.11.0 reste dans la branche 2.x, compatible avec
          le générateur de source (l'API a changé en 3.x). -->
     <PackageReference Include="Microsoft.OpenApi" Version="2.11.0" />
+    <PackageReference Include="QuestPDF" Version="2026.7.1" />
     <!-- Override transitif : e_sqlite3 2.1.11 (apporté par EF Core Sqlite) est
          marqué vulnérable (NU1903). 2.1.12 corrige l'advisory. -->
     <PackageReference Include="SQLitePCLRaw.bundle_e_sqlite3" Version="2.1.12" />
