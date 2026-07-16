@@ -1,0 +1,6 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/SiteGuardian.Api.Tests/SiteGuardian.Api.Tests.csproj" />
+    <Project Path="src/SiteGuardian.Api/SiteGuardian.Api.csproj" />
+  </Folder>
+</Solution>

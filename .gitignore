@@ -1,0 +1,33 @@
+# --- .NET ---
+bin/
+obj/
+*.user
+[Dd]ebug/
+[Rr]elease/
+artifacts/
+
+# Base SQLite locale (jamais commitée)
+*.db
+*.db-shm
+*.db-wal
+
+# Secrets de dev (dotnet user-secrets vit hors du repo, mais par sécurité)
+appsettings.*.Local.json
+secrets.json
+
+# --- Node / Angular ---
+node_modules/
+frontend/dist/
+frontend/.angular/
+npm-debug.log*
+yarn-error.log*
+
+# --- IDE / OS ---
+.vs/
+.idea/
+*.swp
+.DS_Store
+Thumbs.db
+
+# Dossier d'exemples (rapports de référence) — hors versionnement
+exemples/

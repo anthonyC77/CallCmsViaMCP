@@ -1,0 +1,21 @@
+<main class="shell">
+  <header>
+    <h1>{{ title }}</h1>
+    <p class="phase">{{ phase }}</p>
+  </header>
+
+  <section class="status">
+    <p>
+      Mode :
+      <strong>{{ demo ? 'Démo (données mockées, aucune écriture réelle)' : 'Local (API réelle)' }}</strong>
+    </p>
+    <p>API : <code>{{ apiBaseUrl || '— (mode démo)' }}</code></p>
+  </section>
+
+  <p class="hint">
+    Squelette opérationnel. Les 3 écrans (Tableau de bord, Corrections, Historique)
+    arrivent en Phase 4.
+  </p>
+
+  <router-outlet />
+</main>

@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.2" />
+    <!-- Override transitif : la 2.0.0 apportée par AspNetCore.OpenApi est marquée
+         vulnérable (NU1903). La 2.11.0 reste dans la branche 2.x, compatible avec
+         le générateur de source (l'API a changé en 3.x). -->
+    <PackageReference Include="Microsoft.OpenApi" Version="2.11.0" />
+    <!-- Override transitif : e_sqlite3 2.1.11 (apporté par EF Core Sqlite) est
+         marqué vulnérable (NU1903). 2.1.12 corrige l'advisory. -->
+    <PackageReference Include="SQLitePCLRaw.bundle_e_sqlite3" Version="2.1.12" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.10">
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+      <PrivateAssets>all</PrivateAssets>
+    </PackageReference>
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="10.0.10" />
+  </ItemGroup>
+
+</Project>
