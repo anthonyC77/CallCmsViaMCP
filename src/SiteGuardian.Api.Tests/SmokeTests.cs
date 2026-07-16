@@ -5,8 +5,7 @@ using SiteGuardian.Api.Models;
 namespace SiteGuardian.Api.Tests;
 
 /// <summary>
-/// Tests de fumée Phase 0 : vérifient que le squelette compile, que la référence
-/// vers l'Api fonctionne et que le DbContext persiste les entités de base.
+/// Tests de fumée : le DbContext persiste les entités avec le schéma swarm.
 /// </summary>
 public class SmokeTests
 {
@@ -30,11 +29,14 @@ public class SmokeTests
         var job = new AuditJob { TargetUrl = "https://example.com" };
         job.Findings.Add(new Finding
         {
-            Category = "faute-orthographe",
-            Problem = "acccompagnement",
-            ProposedCorrection = "accompagnement",
-            Severity = FindingSeverity.Important,
-            PageCount = 43
+            FindingId = "content-typo",
+            Title = "Faute d'orthographe dans le bandeau",
+            Category = "content",
+            Severity = FindingSeverity.High,
+            Fix = "Corriger le texte du bandeau",
+            SourceAgent = "web-audit-script",
+            Pages = new List<string> { "https://example.com/", "https://example.com/blog" },
+            PageCount = 2,
         });
 
         context.AuditJobs.Add(job);
@@ -42,7 +44,9 @@ public class SmokeTests
 
         var reloaded = context.AuditJobs.Include(a => a.Findings).Single();
         Assert.Single(reloaded.Findings);
-        Assert.Equal(43, reloaded.Findings[0].PageCount);
+        Assert.Equal(2, reloaded.Findings[0].PageCount);
+        Assert.Equal(2, reloaded.Findings[0].Pages.Count);
+        Assert.Equal(FindingSeverity.High, reloaded.Findings[0].Severity);
     }
 
     [Fact]

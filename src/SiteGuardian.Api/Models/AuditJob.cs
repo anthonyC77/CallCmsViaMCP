@@ -18,6 +18,14 @@ public class AuditJob
     /// <summary>Coût estimé de l'audit en EUR (garde-fou budgétaire, cf. §11 du plan).</summary>
     public decimal EstimatedCostEur { get; set; }
 
+    /// <summary>Origine : « script » (web_audit_agent.py) ou « import » (rapport du swarm).</summary>
+    public string Source { get; set; } = "script";
+
+    public int PagesAudited { get; set; }
+
+    /// <summary>Message d'erreur si Status == Failed.</summary>
+    public string? Error { get; set; }
+
     public List<Finding> Findings { get; set; } = new();
 }
 
