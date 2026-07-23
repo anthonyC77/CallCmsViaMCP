@@ -16,6 +16,8 @@ public class SiteGuardianDbContext : DbContext
 
     public DbSet<CorrectionRecord> Corrections => Set<CorrectionRecord>();
 
+    public DbSet<PageTextHash> PageTextHashes => Set<PageTextHash>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<AuditJob>()

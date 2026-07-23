@@ -92,6 +92,7 @@ class AuditResult:
     links_checked: int = 0
     broken_links: List[str] = field(default_factory=list)
     error: str = ""
+    text_content: str = ""  # texte visible de la page (rempli si --include-text)
 
 
 def search_duckduckgo(query: str, limit: int = 10) -> List[str]:
@@ -333,7 +334,19 @@ def expand_psychologuenet_targets(urls: List[str], max_profiles: int = 30,
 
 
 
-def audit_url(url: str, check_links: bool = True, link_workers: int = 8) -> AuditResult:
+MAX_TEXT_CONTENT_CHARS = 20000
+
+
+def extract_visible_text(soup: BeautifulSoup) -> str:
+    """Texte visible de la page (sans scripts/styles), espaces normalises."""
+    for tag in soup(["script", "style", "noscript", "template"]):
+        tag.decompose()
+    text = " ".join(soup.get_text(separator=" ").split())
+    return text[:MAX_TEXT_CONTENT_CHARS]
+
+
+def audit_url(url: str, check_links: bool = True, link_workers: int = 8,
+              include_text: bool = False) -> AuditResult:
     if not url.startswith(("http://", "https://")):
         url = "https://" + url
     result = AuditResult(url=url)
@@ -479,6 +492,10 @@ def audit_url(url: str, check_links: bool = True, link_workers: int = 8) -> Audi
         if broken:
             msg = f"{len(broken)} lien(s) casse(s) sur {checked} teste(s)"
             (result.issues if len(broken) > 3 else result.warnings).append(msg)
+
+    # En dernier : extract_visible_text mute le soup (decompose des scripts/styles).
+    if include_text:
+        result.text_content = extract_visible_text(soup)
 
     return _finalize(result)
 
@@ -693,6 +710,8 @@ def main() -> int:
     p.add_argument("--json", dest="json_path", help="Export JSON")
     p.add_argument("--html", dest="html_path", help="Export HTML (rapport visuel)")
     p.add_argument("--no-color", action="store_true", help="Desactive les couleurs")
+    p.add_argument("--include-text", action="store_true",
+                   help="Inclut le texte visible de chaque page dans l'export (analyse de contenu)")
     args = p.parse_args()
 
     if args.no_color: C.disable()
@@ -729,7 +748,8 @@ def main() -> int:
     results: List[AuditResult] = []
     print(f"{C.BLUE}Audit de {len(targets)} site(s) avec {args.workers} worker(s)...{C.RESET}")
     with ThreadPoolExecutor(max_workers=args.workers) as ex:
-        future_to_url = {ex.submit(audit_url, url, check_links): url for url in targets}
+        future_to_url = {ex.submit(audit_url, url, check_links,
+                                   include_text=args.include_text): url for url in targets}
         done = 0
         for fut in as_completed(future_to_url):
             url = future_to_url[fut]; done += 1

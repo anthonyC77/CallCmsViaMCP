@@ -1,12 +1,18 @@
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging.Abstractions;
+using SiteGuardian.Api.Data;
 using SiteGuardian.Api.Models;
 using SiteGuardian.Api.Services.Audit;
+using SiteGuardian.Api.Services.Llm;
 
 namespace SiteGuardian.Api.Cli;
 
 /// <summary>
 /// Mode CLI : `dotnet run -- audit &lt;url&gt; [--max-pages N] [--pdf chemin.pdf]`.
-/// Audit complet sans serveur web ni base — pensé pour le cron GitHub Actions (§11).
+/// Audit complet sans serveur web — pensé pour le cron GitHub Actions (§11).
+/// Contrôles déterministes toujours exécutés ; l'analyse de contenu LLM ne
+/// s'active que si une clé Anthropic est configurée (sinon 0 €, cf. §11).
 /// Sortie : findings groupés par sévérité sur stdout (+ PDF en option).
 /// Code retour 0 = OK, 1 = erreur.
 /// </summary>
@@ -30,6 +36,13 @@ public static class AuditCommand
                 pdfPath = args[i + 1];
         }
 
+        var config = new ConfigurationBuilder()
+            .SetBasePath(AppContext.BaseDirectory)
+            .AddJsonFile("appsettings.json", optional: true)
+            .AddUserSecrets(typeof(AuditCommand).Assembly, optional: true)
+            .AddEnvironmentVariables()
+            .Build();
+
         try
         {
             using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(30) };
@@ -37,18 +50,54 @@ public static class AuditCommand
 
             var sitemap = new SitemapFetcher(http);
             var python = new PythonAuditService(
-                Environment.GetEnvironmentVariable("SITEGUARDIAN_PYTHON") ?? "python",
+                config["Audit:PythonExecutable"] ?? "python",
                 PythonAuditService.ResolveScriptPath(
-                    Environment.GetEnvironmentVariable("SITEGUARDIAN_SCRIPT") ?? "web_audit_agent.py",
-                    AppContext.BaseDirectory),
+                    config["Audit:ScriptPath"] ?? "web_audit_agent.py", AppContext.BaseDirectory),
                 NullLogger<PythonAuditService>.Instance);
+
+            var apiKey = config["Anthropic:ApiKey"] ?? Environment.GetEnvironmentVariable("ANTHROPIC_API_KEY");
+            ILlmProvider llm = string.IsNullOrWhiteSpace(apiKey)
+                ? new DisabledLlmProvider()
+                : new AnthropicLlmProvider(apiKey, NullLogger<AnthropicLlmProvider>.Instance);
+
+            var contentAnalyzer = new ContentAnalyzer(
+                llm,
+                SpellingPrefilter.CreateFrench(AppContext.BaseDirectory),
+                new ContentAnalyzerOptions
+                {
+                    Model = config["Agents:Surveillance:Model"] ?? "claude-sonnet-5",
+                    BatchPages = config.GetValue("Agents:Surveillance:BatchPages", 5),
+                    MaxCostEur = config.GetValue("Budget:MaxCoutEstimeParAuditEUR", 0.50m),
+                    InputPricePerMTokEur = config.GetValue("Budget:PrixEntreeEURParMTokens", 2.8m),
+                    OutputPricePerMTokEur = config.GetValue("Budget:PrixSortieEURParMTokens", 14m),
+                },
+                NullLogger<ContentAnalyzer>.Instance);
+
+            if (!contentAnalyzer.IsEnabled)
+                Console.WriteLine("[SiteGuardian] Aucune clé Anthropic configurée : contrôles déterministes uniquement (0 €).");
+
+            var dbOptions = new DbContextOptionsBuilder<SiteGuardianDbContext>()
+                .UseSqlite(config.GetConnectionString("SiteGuardian") ?? "Data Source=siteguardian.db")
+                .Options;
+            using var db = new SiteGuardianDbContext(dbOptions);
+            db.Database.EnsureCreated();
 
             Console.WriteLine($"[SiteGuardian] Sitemap de {root} …");
             var urls = await sitemap.GetPageUrlsAsync(root, maxPages);
             Console.WriteLine($"[SiteGuardian] {urls.Count} page(s) à auditer via web_audit_agent.py …");
 
-            var results = await python.RunAsync(urls);
+            var results = await python.RunAsync(urls, includeText: contentAnalyzer.IsEnabled);
             var findings = FindingMapper.Map(results);
+
+            if (contentAnalyzer.IsEnabled)
+            {
+                Console.WriteLine("[SiteGuardian] Analyse de contenu (LLM, incrémentale)…");
+                var analysis = await AuditRunner.RunContentAnalysisAsync(db, contentAnalyzer, results);
+                findings.AddRange(analysis.Findings);
+                if (analysis.EstimatedCostEur > 0)
+                    Console.WriteLine($"[SiteGuardian] Coût LLM estimé : {analysis.EstimatedCostEur:F3} €" +
+                        (analysis.PagesSkipped > 0 ? $" ({analysis.PagesSkipped} page(s) inchangée(s) sautée(s))" : ""));
+            }
 
             Console.WriteLine();
             Console.WriteLine($"=== {findings.Count} finding(s) sur {results.Count} page(s) ===");

@@ -47,6 +47,9 @@ public class ScriptAuditResult
     public List<string> BrokenLinks { get; set; } = new();
     public string Error { get; set; } = string.Empty;
 
+    /// <summary>Texte visible de la page (rempli si le script est lancé avec --include-text).</summary>
+    public string TextContent { get; set; } = string.Empty;
+
     public static readonly JsonSerializerOptions JsonOptions = new()
     {
         PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower,

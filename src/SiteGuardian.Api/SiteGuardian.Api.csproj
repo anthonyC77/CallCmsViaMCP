@@ -7,6 +7,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="Anthropic" Version="12.36.0" />
     <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.2" />
     <!-- Override transitif : la 2.0.0 apportée par AspNetCore.OpenApi est marquée
          vulnérable (NU1903). La 2.11.0 reste dans la branche 2.x, compatible avec
@@ -21,6 +22,12 @@
       <PrivateAssets>all</PrivateAssets>
     </PackageReference>
     <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="10.0.10" />
+    <PackageReference Include="WeCantSpell.Hunspell" Version="7.0.1" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Dictionnaires Hunspell FR (LibreOffice, licence MPL — cf. README_dict_fr.txt) -->
+    <None Update="Dictionaries\**\*" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
 </Project>

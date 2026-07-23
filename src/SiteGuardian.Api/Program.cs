@@ -3,6 +3,7 @@ using SiteGuardian.Api.Data;
 using SiteGuardian.Api.Hubs;
 using SiteGuardian.Api.Models;
 using SiteGuardian.Api.Services.Audit;
+using SiteGuardian.Api.Services.Llm;
 
 // --- Point d'entrée CLI (audit sans serveur web, cf. §11 du plan) -----------
 // Utilisé par le cron GitHub Actions : `dotnet run -- audit <url>`.
@@ -33,6 +34,34 @@ builder.Services.AddSingleton(sp => PythonAuditService.FromConfiguration(
     sp.GetRequiredService<IHostEnvironment>().ContentRootPath,
     sp.GetRequiredService<ILogger<PythonAuditService>>()));
 builder.Services.AddScoped<AuditRunner>();
+
+// --- LLM (§5/§11 du plan) : Claude si clé configurée (user-secrets), sinon désactivé —
+// l'audit reste alors 100 % déterministe (0 €).
+builder.Services.AddSingleton<ILlmProvider>(sp =>
+{
+    var config = sp.GetRequiredService<IConfiguration>();
+    var apiKey = config["Anthropic:ApiKey"]
+                 ?? Environment.GetEnvironmentVariable("ANTHROPIC_API_KEY");
+    return string.IsNullOrWhiteSpace(apiKey)
+        ? new DisabledLlmProvider()
+        : new AnthropicLlmProvider(apiKey, sp.GetRequiredService<ILogger<AnthropicLlmProvider>>());
+});
+builder.Services.AddSingleton(sp => SpellingPrefilter.CreateFrench(
+    sp.GetRequiredService<IHostEnvironment>().ContentRootPath,
+    sp.GetRequiredService<ILogger<SpellingPrefilter>>()));
+builder.Services.AddSingleton(sp =>
+{
+    var config = sp.GetRequiredService<IConfiguration>();
+    return new ContentAnalyzerOptions
+    {
+        Model = config["Agents:Surveillance:Model"] ?? "claude-sonnet-5",
+        BatchPages = config.GetValue("Agents:Surveillance:BatchPages", 5),
+        MaxCostEur = config.GetValue("Budget:MaxCoutEstimeParAuditEUR", 0.50m),
+        InputPricePerMTokEur = config.GetValue("Budget:PrixEntreeEURParMTokens", 2.8m),
+        OutputPricePerMTokEur = config.GetValue("Budget:PrixSortieEURParMTokens", 14m),
+    };
+});
+builder.Services.AddScoped<ContentAnalyzer>();
 
 // CORS restreint au front local + GitHub Pages (démo lecture seule), cf. §12.
 var allowedOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>()

@@ -51,7 +51,7 @@ public class PythonAuditService
     }
 
     public async Task<List<ScriptAuditResult>> RunAsync(
-        IReadOnlyList<string> urls, CancellationToken ct = default)
+        IReadOnlyList<string> urls, bool includeText = false, CancellationToken ct = default)
     {
         if (urls.Count == 0) return new List<ScriptAuditResult>();
 
@@ -68,6 +68,8 @@ public class PythonAuditService
         psi.ArgumentList.Add(string.Join(",", urls));
         psi.ArgumentList.Add("--json");
         psi.ArgumentList.Add(jsonPath);
+        if (includeText)
+            psi.ArgumentList.Add("--include-text");
 
         _logger.LogInformation("Lancement de l'audit Python : {Script} sur {Count} URL(s)", _scriptPath, urls.Count);
 
